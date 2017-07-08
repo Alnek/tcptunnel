@@ -1,5 +1,4 @@
-#HOST = '127.0.0.1';
-HOST = 'localhost';
+HOST = '0.0.0.0';
 PORT = 50000;
 BUF_SIZE = 1024;
 
