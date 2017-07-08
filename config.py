@@ -4,3 +4,7 @@ BUF_SIZE = 1024;
 
 PROXY_HOST = 'proxy10.sperasoft.com'
 PROXY_PORT = 3129
+
+TARGET_HOST = '192.168.0.2'
+TARGET_PORT = 3389
+
