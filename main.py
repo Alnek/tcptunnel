@@ -22,17 +22,16 @@ def onExit(action):
     action_list.append(action)
 
 read_list = []
-write_list = []
-ex_list = []
 
 read_handler = {}
 write_handler = {}
 
 def Accept(socket):
     conn, address = socket.accept()
-    print 'connected: ', address[0], ':', address[1]
-    read_list.append(conn)
-    read_handler[conn.fileno()] = Echo
+    print 'accepted: ', address[0], ':', address[1]
+    #read_list.append(conn)
+    #read_handler[conn.fileno()] = Echo
+    CreateTunnel(conn)
 
 def Echo(socket):
     data = socket.recv(BUF_SIZE)
@@ -41,8 +40,56 @@ def Echo(socket):
     else:
         address = socket.getpeername()
         print 'disconnected: ', address[0], ':', address[1]
-        socket.close()
         read_list.remove(socket)
+        socket.close()        
+        
+def CreateTunnel(source):
+    target = socket.create_connection((TARGET_HOST, TARGET_PORT), 2)
+    target.settimeout(None)
+
+    address = target.getpeername()
+    print 'connected: ', address[0], ':', address[1]
+    
+    def disconnect_both():
+        address = source.getpeername()
+        print 'disconnected: ', address[0], ':', address[1]
+        address = target.getpeername()
+        print 'disconnected: ', address[0], ':', address[1]
+
+        read_list.remove(source)
+        read_list.remove(target)
+        
+        source.shutdown(socket.SHUT_RDWR)
+        source.close()
+        target.shutdown(socket.SHUT_RDWR)
+        target.close()
+    
+    def target_read(socket):
+        try:
+            data = target.recv(BUF_SIZE)
+            if len(data) > 0:
+                source.send(data)
+            else:
+                disconnect_both()
+        except:
+            disconnect_both()
+
+    def source_read(socket):
+        try:
+            data = source.recv(BUF_SIZE)
+            if len(data) > 0:
+                target.send(data)
+            else:
+                disconnect_both()
+        except:
+            disconnect_both()
+
+    read_handler[source.fileno()] = source_read
+    read_handler[target.fileno()] = target_read
+    read_list.append(source)
+    read_list.append(target)
+
+    return
 
 def main():
 #    conn = httplib.HTTPConnection(PROXY_HOST, PROXY_PORT)
@@ -62,9 +109,6 @@ def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     onExit(lambda:( server.close()))
 
-    #target = socket.create_connection((TARGET_HOST, TARGET_PORT), 2)
-    #target.settimeout(None)
-
     server.bind((HOST,PORT))
     server.listen(0)
     read_handler[server.fileno()] = Accept
@@ -72,7 +116,7 @@ def main():
     read_list.append(server)
 
     while True:
-        readable, writable, errored = select.select(read_list, write_list, ex_list, 1)
+        readable, writable, errored = select.select(read_list, [], [], 1)
         
         if len(readable) == 0:
             continue
