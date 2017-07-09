@@ -21,16 +21,28 @@ signal.signal(signal.SIGINT, signal_handler)
 def onExit(action):
     action_list.append(action)
 
-read_task = {}
+read_list = []
+write_list = []
+ex_list = []
+
+read_handler = {}
+write_handler = {}
 
 def Accept(socket):
     conn, address = socket.accept()
     print 'connected: ', address[0], ':', address[1]
     read_list.append(conn)
-    read_task[conn.fileno()] = Empty
+    read_handler[conn.fileno()] = Echo
 
-def Empty(socket):
-    return
+def Echo(socket):
+    data = socket.recv(BUF_SIZE)
+    if len(data) > 0:
+        socket.send(data)
+    else:
+        address = socket.getpeername()
+        print 'disconnected: ', address[0], ':', address[1]
+        socket.close()
+        read_list.remove(socket)
 
 def main():
 #    conn = httplib.HTTPConnection(PROXY_HOST, PROXY_PORT)
@@ -55,32 +67,18 @@ def main():
 
     server.bind((HOST,PORT))
     server.listen(0)
-    read_task[server.fileno()] = Accept
+    read_handler[server.fileno()] = Accept
 
-    read_list = [server]
-    write_list = []
+    read_list.append(server)
 
     while True:
-        readable, writable, errored = select.select(read_list, write_list, [], 1)
+        readable, writable, errored = select.select(read_list, write_list, ex_list, 1)
         
         if len(readable) == 0:
             continue
             
         for sock in readable:
-            read_task[sock.fileno()](sock)
-#            if sock is server:
-#                conn, address = server.accept()
-#                print 'connected: ', address[0], ':', address[1]
-#                read_list.append(conn)
-#            else:
-#                data = sock.recv(BUF_SIZE)
-#                if len(data) > 0:
-#                    sock.send(data)
-#                else:
-#                    address = sock.getpeername()
-#                    print 'disconnected: ', address[0], ':', address[1]
-#                    sock.close()
-#                    read_list.remove(sock)
+            read_handler[sock.fileno()](sock)
 
 if __name__ == '__main__':
     main()
